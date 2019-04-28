@@ -56,6 +56,10 @@ command(take(Thing)) -->
 command(put(Thing)) -->
     (   [put] | [drop] | [leave] ),
     thing(Thing).
+command(turn_on(Device)) -->
+    [turn,on],
+    device(Device).
+
 command(inventory) -->
     [i] |
     [inv] |
@@ -78,8 +82,9 @@ place(X) -->
     {adventure:room(X)}.
 
 thing(X) -->
-    { adventure:hold(location(X, _)) }.
-%    { larkc_client_eval_wrappers:cycQuery([isa,X,naniObject],'LD44-user_43-Mt',Result), %length(Result,L), L > 0 }.
+	[X],
+	{ hold(isa(X, naniObject)) }.
 
-% adventure:location(X, _)
-
+device(X) -->
+	[X],
+	{ hold(isa(X, device))}.

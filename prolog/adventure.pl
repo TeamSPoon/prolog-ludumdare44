@@ -12,24 +12,59 @@
                       close_door/2,
                       puzzle/1,
                       error_input/0,
-                     init_game_state/0]).
+		      init_game_state/0,
+		      hold/1]).
 
 :- use_module(library(http/http_session)).
 :- use_module(library(pengines)).
 
+:- use_module(nanisearch_helper).
+:- use_module(larkc_hold).
+
+use_larkc :- fail.
+
 :- dynamic current_hold/2.
 
+hold(X) :- use_larkc, !, larkc_hold(X).
 hold(X) :-
-    pengine_self(Session),
-    current_hold(Session, X).
+	pengine_self(Session),
+	current_hold(Session, X).
 
+retractall_hold(X) :- use_larkc, !, larkc_retractall_hold(X).
 retractall_hold(X) :-
-    pengine_self(Session),
-    retractall(current_hold(Session, X)).
+	pengine_self(Session),
+	retractall(current_hold(Session, X)).
 
+asserta_hold(X) :- use_larkc, !, larkc_asserta_hold(X).
 asserta_hold(X) :-
-    pengine_self(Session),
-    asserta(current_hold(Session, X)).
+	pengine_self(Session),
+	asserta(current_hold(Session, X)).
+
+session_mt(Mt):- 
+	pengine_self(Session),
+	getMicrotheoryFromSessionID(Session,Mt).
+
+larkc_retractall_hold(X) :-
+	session_mt(Mt),
+	findall(X,larkc_hold(X),Is),
+	member(Item,Is),
+	debug(larkc,'~q.',[retract(Item))]),
+	Item =.. List,
+	cycUnassert(List,Mt,Result),
+	writeln([Result,larkc_retractall_hold]),
+	fail.
+larkc_retractall_hold(_).
+
+
+getMt(Session,Mt) :-
+	atomic_list_concat(['LD44-user_', Session, '-Mt'], Mt).
+
+larkc_asserta_hold(X) :-
+    session_mt(Mt),
+	debug(larkc, '~q', writeln([asserta(X),mt(Mt)])),
+	X =.. List,
+	cycAssert(List,Mt,Result),
+	writeln([Result,larkc_asserta_hold]).
 
 /*
 :- dynamic here/1.
@@ -84,9 +119,13 @@ write_description(X) :-
     describe(X, D),
     write(D).
 
-
 init_game_state :-
-    maplist(asserta_hold, [
+	% larkc_init_game_state,
+	prolog_init_game_state,
+    !.
+
+prolog_init_game_state :-
+    maplist(prolog_asserta_hold, [
                 opened(office, hall),
                 opened(kitchen, office),
                 % opened(hall, diningRoom),
@@ -108,6 +147,11 @@ init_game_state :-
                 here(kitchen)
             ]).
 
+larkc_init_game_state :-
+	debug(larkc, '~q',[larkc_init_game_state]),
+	pengine_self(Session),
+	loadNaniSearchIntoLarKC(Session),
+    debug(larkc, '~q',[done_larkc_init_game_state]).
 
 where_food(X,Y) :-
     hold(location(X,Y)),
@@ -116,8 +160,8 @@ where_food(X,Y) :-
     hold(location(X,Y)),
     tastes_yucky(X).
 
-connect(X,Y) :- door(X,Y).
-connect(X,Y) :- door(Y,X).
+connect(X,Y) :- hold(door(X,Y)).
+connect(X,Y) :- hold(door(Y,X)).
 
 list_things(Place) :-
     list_things_s(Place).
