@@ -13,7 +13,7 @@
                       puzzle/1,
                       error_input/0,
 		      init_game_state/0,
-		      hold/1]).
+		      user_sess_call/1]).
 
 :- use_module(library(http/http_session)).
 :- use_module(library(pengines)).
@@ -25,46 +25,20 @@ use_larkc :- fail.
 
 :- dynamic current_hold/2.
 
-hold(X) :- use_larkc, !, larkc_hold(X).
-hold(X) :-
-	pengine_self(Session),
-	current_hold(Session, X).
+user_sess_call(X) :- use_larkc, !, larkc_hold(X).
+user_sess_call(X) :-
+    pengine_self(Session),
+    current_hold(Session, X).
 
-retractall_hold(X) :- use_larkc, !, larkc_retractall_hold(X).
-retractall_hold(X) :-
-	pengine_self(Session),
-	retractall(current_hold(Session, X)).
+user_sess_retractall(X) :- use_larkc, !, larkc_retractall_hold(X).
+user_sess_retractall(X) :-
+    pengine_self(Session),
+    retractall(current_hold(Session, X)).
 
-asserta_hold(X) :- use_larkc, !, larkc_asserta_hold(X).
-asserta_hold(X) :-
-	pengine_self(Session),
-	asserta(current_hold(Session, X)).
-
-session_mt(Mt):- 
-	pengine_self(Session),
-	getMicrotheoryFromSessionID(Session,Mt).
-
-larkc_retractall_hold(X) :-
-	session_mt(Mt),
-	findall(X,larkc_hold(X),Is),
-	member(Item,Is),
-	debug(larkc,'~q.',[retract(Item))]),
-	Item =.. List,
-	cycUnassert(List,Mt,Result),
-	writeln([Result,larkc_retractall_hold]),
-	fail.
-larkc_retractall_hold(_).
-
-
-getMt(Session,Mt) :-
-	atomic_list_concat(['LD44-user_', Session, '-Mt'], Mt).
-
-larkc_asserta_hold(X) :-
-    session_mt(Mt),
-	debug(larkc, '~q', writeln([asserta(X),mt(Mt)])),
-	X =.. List,
-	cycAssert(List,Mt,Result),
-	writeln([Result,larkc_asserta_hold]).
+user_sess_asserta(X) :- use_larkc, !, larkc_asserta_hold(X).
+user_sess_asserta(X) :-
+    pengine_self(Session),
+    asserta(current_hold(Session, X)).
 
 /*
 :- dynamic here/1.
@@ -73,7 +47,6 @@ larkc_asserta_hold(X) :-
 :- dynamic turned_on/1.
 :- multifile opened/2.
 :- dynamic opened/2.
-*/
 
 room(kitchen).
 room(office).
@@ -90,13 +63,13 @@ edible(apple).
 edible(crackers).
 tastes_yucky(broccoli).
 
+*/
+
+
 :- dynamic described/2.
 
-longd(office, 'home office, with a desk, computer, work lamp, and chair').
-shortd(office, 'home office').
-
 long_description(X, Long) :-
-    longd(X, Long),
+    user_sess_call(longd(X, Long)),
     !.
 long_description(X, X).
 
@@ -119,17 +92,15 @@ write_description(X) :-
     describe(X, D),
     write(D).
 
-init_game_state :-
-	% larkc_init_game_state,
-	prolog_init_game_state,
-    !.
 
-prolog_init_game_state :-
+init_game_state :-
+    larkc_init_game_state,
     maplist(prolog_asserta_hold, [
                 opened(office, hall),
                 opened(kitchen, office),
                 % opened(hall, diningRoom),
-
+				longd(office, 'home office, with a desk, computer, work lamp, and chair').
+				shortd(office, 'home office').
                 opened(kitchen, cellar),
                 opened(diningRoom, kitchen),
                 location(desk, office),
@@ -154,19 +125,19 @@ larkc_init_game_state :-
     debug(larkc, '~q',[done_larkc_init_game_state]).
 
 where_food(X,Y) :-
-    hold(location(X,Y)),
-    edible(X).
+    user_sess_call(location(X,Y)),
+    user_sess_call(edible(X)).
 where_food(X,Y) :-
-    hold(location(X,Y)),
-    tastes_yucky(X).
+    user_sess_call(location(X,Y)),
+    user_sess_call(tastes_yucky(X)).
 
-connect(X,Y) :- hold(door(X,Y)).
-connect(X,Y) :- hold(door(Y,X)).
+connect(X,Y) :- user_sess_call(door(X,Y)).
+connect(X,Y) :- user_sess_call(door(Y,X)).
 
 list_things(Place) :-
     list_things_s(Place).
 list_things(Place) :-
-    hold(location(X, Place)),
+    user_sess_call(location(X, Place)),
     tab(2),
     write_description(X),
     nl,
@@ -182,7 +153,7 @@ list_connections(Place) :-
 list_connections(_).
 
 look :-
-    hold(here(Place)),
+    user_sess_call(here(Place)),
     describe(Place, Desc),
     write('You are in the '), write(Desc), nl,
     write('You can see:'), nl,
@@ -193,7 +164,7 @@ look :-
 
 look_in(Place) :-
     write('In '), write_description(Place), write(' are the following:'), nl,
-    hold(location(X, Place)),
+    user_sess_call(location(X, Place)),
     tab(2), write_description(X), fail.
 look_in(_).
 
@@ -204,11 +175,11 @@ goto(Place):-
     look.
 
 can_go(Place):-
-    hold(here(X)),
+    user_sess_call(here(X)),
     connect(X,Place),
     is_opened(X,Place).
 can_go(Place):-
-    hold(here(X)),
+    user_sess_call(here(X)),
     connect(X,Place),
     write('The door is shut.'), nl, fail.
 can_go(_):-
@@ -216,8 +187,8 @@ can_go(_):-
     fail.
 
 move(Place):-
-    retractall_hold(here(_)),
-    asserta_hold(here(Place)).
+    user_sess_retractall(here(_)),
+    user_sess_asserta(here(Place)).
 
 take(X):-
     can_take(X),
@@ -226,7 +197,7 @@ take(X):-
 can_take(Thing) :-
     can_take_s(Thing).
 can_take(Thing) :-
-    hold(here(Place)),
+    user_sess_call(here(Place)),
     is_contained_in(Thing, Place).
 can_take(Thing) :-
     write('There is no '),
@@ -235,8 +206,8 @@ can_take(Thing) :-
     nl, fail.
 
 take_object(X) :-
-    retractall_hold(location(X,_)),
-    asserta_hold(have(X)),
+    user_sess_retractall(location(X,_)),
+    user_sess_asserta(have(X)),
     write('taken'), nl.
 
 put(X) :-
@@ -244,8 +215,8 @@ put(X) :-
     put_object(X).
 
 can_put(Thing) :-
-    hold(here(_)),
-    hold(have(Thing)).
+    user_sess_call(here(_)),
+    user_sess_call(have(Thing)).
 can_put(Thing) :-
     write('You cannot place '),
     write_description(Thing),
@@ -253,15 +224,15 @@ can_put(Thing) :-
     nl, fail.
 
 put_object(X) :-
-    hold(here(Location)),
-    retractall_hold(have(X)),
-    asserta_hold(location(X,Location)),
+    user_sess_call(here(Location)),
+    user_sess_retractall(have(X)),
+    user_sess_asserta(location(X,Location)),
     write('put'), nl.
 
 inventory :-
     write('You have the following things:'),
     nl,
-    hold(have(X)),
+    user_sess_call(have(X)),
     tab(3),
     write_description(X),
     nl,
@@ -273,7 +244,7 @@ turn_on(X) :-
     turn_on_object(X).
 
 can_turn_on(X) :-
-    hold(have(X)).
+    user_sess_call(have(X)).
 can_turn_on(X) :-
     write('You cannot turn on '),
     write_description(X),
@@ -281,15 +252,15 @@ can_turn_on(X) :-
     nl, fail.
 
 turn_on_object(X) :-
-    asserta_hold(turned_on(X)).
+    user_sess_asserta(turned_on(X)).
 
 turn_off(X) :-
     can_turn_off(X),
     turn_off_object(X).
 
 can_turn_off(X) :-
-    hold(have(X)),
-    hold(turned_on(X)).
+    user_sess_call(have(X)),
+    user_sess_call(turned_on(X)).
 
 can_turn_off(X) :-
     write('You cannot turn off '),
@@ -298,14 +269,14 @@ can_turn_off(X) :-
     nl, fail.
 
 turn_off_object(X) :-
-    retractall_hold(turned_on(X)).
+    user_sess_retractall(turned_on(X)).
 
 open_door(Location,OtherSide) :-
     can_open_door(Location,OtherSide),
     do_open_door(Location,OtherSide).
 
 can_open_door(Location,OtherSide) :-
-    hold(here(Location)),
+    user_sess_call(here(Location)),
     connect(Location,OtherSide).
 can_open_door(Location,OtherSide) :-
     write('You cannot open the door from '),
@@ -317,18 +288,18 @@ can_open_door(Location,OtherSide) :-
     fail.
 
 % can_open_door(Location,OtherSide) :-
-%     hold(here(Location)),
+%     user_sess_call(here(Location)),
 %     connect(Location,OtherSide).
 %     key_for_door(Key,Location,OtherSide).
-%     not(hold(have(Key))),
+%     not(user_sess_call(have(Key))),
 %     write('You need the key'),nl,fail.
 % can_open_door(Location,OtherSide) :-
-%     hold(here(Location)),
+%     user_sess_call(here(Location)),
 %     connect(Location,OtherSide).
 %     key_for_door(Key,Location,OtherSide).
-%     hold(have(Key)).
+%     user_sess_call(have(Key)).
 % can_open_door(Location,OtherSide) :-
-%     hold(here(Location)),
+%     user_sess_call(here(Location)),
 %     connect(Location,OtherSide).
 %     not(key_for_door(Key,Location,OtherSide)).
 % can_open_door(Location,OtherSide) :-
@@ -337,20 +308,20 @@ can_open_door(Location,OtherSide) :-
 %     nl, fail.
 
 is_opened(Location,OtherSide) :-
-    hold(opened(Location, OtherSide)).
+    user_sess_call(opened(Location, OtherSide)).
 is_opened(Location,OtherSide) :-
-    hold(opened(OtherSide,Location)).
+    user_sess_call(opened(OtherSide,Location)).
 
 do_open_door(Location,OtherSide) :-
 	%% assert(opened(Location,OtherSide)).
-	asserta_hold(opened(Location,OtherSide)).
+	user_sess_asserta(opened(Location,OtherSide)).
 
 close_door(Location,OtherSide) :-
     can_close_door(Location,OtherSide),
     do_close_door(Location,OtherSide).
 
 can_close_door(Location,OtherSide) :-
-    hold(here(Location)),
+    user_sess_call(here(Location)),
     connect(Location,OtherSide),
     is_opened(Location,OtherSide).
 
@@ -363,20 +334,20 @@ can_close_door(Location,OtherSide) :-
     nl, fail.
 
 do_close_door(Location,OtherSide) :-
-    retractall_hold(opened(Location,OtherSide)).
+    user_sess_retractall(opened(Location,OtherSide)).
 do_close_door(Location,OtherSide) :-
-    retractall_hold(opened(OtherSide,Location)).
+    user_sess_retractall(opened(OtherSide,Location)).
 
 is_contained_in(T1,T2) :-
-    hold(location(T1,T2)).
+    user_sess_call(location(T1,T2)).
 is_contained_in(T1,T2) :-
-    hold(location(X,T2)),
+    user_sess_call(location(X,T2)),
     is_contained_in(T1,X).
 
 is_contained_in_b(T1,T2) :-
-    hold(location(T1,T2)).
+    user_sess_call(location(T1,T2)).
 is_contained_in_b(T1,T2) :-
-    hold(location(T1,X)),
+    user_sess_call(location(T1,X)),
     is_contained_in_b(X,T2).
 
 % object(candle, red, small, 1).
@@ -390,17 +361,17 @@ location_s(object(apple, green, small, 1), kitchen).
 location_s(object(table, blue, big, 50), kitchen).
 
 can_take_s(Thing):-
-    hold(here(Room)),
+    user_sess_call(here(Room)),
     location_s(object(Thing, _, small, _), Room).
 can_take_s(Thing) :-
-    hold(here(Room)),
+    user_sess_call(here(Room)),
     location_s(object(Thing, _, big, _), Room),
     write('The '),
     write_description(Thing),
     write(' is too big to carry.'), nl,
     fail.
 can_take_s(Thing) :-
-    hold(here(Room)),
+    user_sess_call(here(Room)),
     not(location_s(object(Thing, _, _, _), Room)),
     write('There is no '),
     write_description(Thing),
@@ -417,8 +388,8 @@ list_things_s(Place) :-
     fail.
 
 puzzle(goto(cellar)) :-
-    hold(have(flashlight)),
-    hold(turned_on(flashlight)),
+    user_sess_call(have(flashlight)),
+    user_sess_call(turned_on(flashlight)),
     !.
 puzzle(goto(cellar)) :-
     write('It''s dark and you are afraid of the dark.'),
